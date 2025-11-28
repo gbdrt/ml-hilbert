@@ -2,12 +2,11 @@
 # For licensing see accompanying LICENSE file.
 # Copyright (C) 2025 Apple Inc. All Rights Reserved.
 #
-from src.models.AsyncHILBERT import AsyncHILBERT
+from src.models.AsyncHILBERT import AsyncHILBERT, PROOF_SYSTEM, AsyncVerifier
 from src.tracking.ProofAttemptConfig import ProofAttemptConfig
 from src.inference.AsyncProverLLM import AsyncProverLLM
 from src.tools.AsyncLLMClient import AsyncLLMClient
 from src.tools.SemanticSearchEngine import SemanticSearchEngine
-from src.inference.AsyncLeanVerifier import AsyncLeanVerifier
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -52,12 +51,12 @@ def run_async_hilbert(cfg):
         """Factory function to create AsyncLLMClient instances for informal reasoning."""
         return AsyncLLMClient(**informal_cfg)
     
-    def create_lean_verifier():
-        """Factory function to create AsyncLeanVerifier instances."""
+    def create_proof_verifier():
+        """Factory function to create AsyncVerifier instances (Lean or Rocq based on PROOF_SYSTEM)."""
         verifier_base_url = exp_cfg.verifier_base_url
-        return AsyncLeanVerifier(base_url=verifier_base_url,
+        return AsyncVerifier(base_url=verifier_base_url,
                         max_concurrent_requests=max_concurrent_requests)
-    
+
     # Create the shared semantic search engine (thread-safe)
     search_engine_params = {k: v for k, v in search_engine_cfg.items()}
     search_engine = SemanticSearchEngine(**search_engine_params)
@@ -66,7 +65,7 @@ def run_async_hilbert(cfg):
     experiment = AsyncHILBERT(
         prover_llm_factory=create_prover_llm,
         informal_llm_client_factory=create_informal_llm_client,
-        lean_verifier_factory=create_lean_verifier,
+        proof_verifier_factory=create_proof_verifier,
         search_engine=search_engine,
         verify_each_subgoal_separately=exp_cfg.verify_each_subgoal_separately,
         proof_attempt_config=exp_cfg.proof_attempt_config,

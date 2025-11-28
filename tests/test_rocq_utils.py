@@ -20,8 +20,8 @@ from src.tools.rocq_utils import (
     extract_proof_body_from_theorem,
     extract_missing_identifiers,
     extract_all_have_names,
-    check_for_sorries,
-    extract_all_theorems_from_string,
+    _check_for_sorries,
+    _extract_all_theorems_from_string,
     remove_import_statements,
     remove_import_lines,
     replace_have_proofs_with_sorry,
@@ -363,43 +363,43 @@ class TestExtractAllHaveNames:
 
 @pytest.mark.requires_server
 class TestCheckForSorries:
-    """Tests for check_for_sorries function."""
+    """Tests for _check_for_sorries function."""
 
     def test_proof_with_admit(self):
         """Test detecting admit."""
         proof = "Theorem foo : 1 = 1. Proof. admit. Admitted."
         assert validate_rocq_code(proof)
-        assert check_for_sorries(proof) is True
+        assert _check_for_sorries(proof) is True
 
     def test_proof_with_admitted(self):
         """Test detecting Admitted."""
         proof = "Theorem foo : 1 = 1. Proof. Admitted."
         assert validate_rocq_code(proof)
-        assert check_for_sorries(proof) is True
+        assert _check_for_sorries(proof) is True
 
     def test_proof_without_admits(self):
         """Test proof without admits."""
         proof = "Theorem foo : 1 = 1. Proof. reflexivity. Qed."
         assert validate_rocq_code(proof)
-        assert check_for_sorries(proof) is False
+        assert _check_for_sorries(proof) is False
 
     def test_admit_in_comment(self):
         """Test that admit in comment is not detected."""
         proof = "(* We could use admit here *) Theorem foo : 1 = 1. Proof. reflexivity. Qed."
         assert validate_rocq_code(proof)
         # After removing comments, admit should not be found
-        assert check_for_sorries(proof) is False
+        assert _check_for_sorries(proof) is False
 
 
 @pytest.mark.requires_server
 class TestExtractAllTheoremsFromString:
-    """Tests for extract_all_theorems_from_string function."""
+    """Tests for _extract_all_theorems_from_string function."""
 
     def test_single_theorem(self):
         """Test extracting single theorem."""
         text = "Theorem foo : 1 = 1. Proof. reflexivity. Qed."
         assert validate_rocq_code(text)
-        theorems = extract_all_theorems_from_string(text)
+        theorems = _extract_all_theorems_from_string(text)
         assert len(theorems) == 1
         assert "Theorem foo" in theorems[0]
 
@@ -411,7 +411,7 @@ Lemma bar : 2 = 2. Proof. reflexivity. Qed.
 Example baz : 3 = 3. Proof. reflexivity. Qed.
 """
         assert validate_rocq_code(text)
-        theorems = extract_all_theorems_from_string(text)
+        theorems = _extract_all_theorems_from_string(text)
         assert len(theorems) == 3
         assert any("Theorem foo" in t for t in theorems)
         assert any("Lemma bar" in t for t in theorems)
@@ -425,13 +425,13 @@ Corollary cor1 : True.
 Proposition prop1 : True.
 """
         assert validate_rocq_code(text)
-        theorems = extract_all_theorems_from_string(text)
+        theorems = _extract_all_theorems_from_string(text)
         assert len(theorems) == 3
 
     def test_empty_text(self):
         """Test extracting from empty text."""
-        assert extract_all_theorems_from_string("") == []
-        assert extract_all_theorems_from_string(None) == []
+        assert _extract_all_theorems_from_string("") == []
+        assert _extract_all_theorems_from_string(None) == []
 
 
 @pytest.mark.requires_server
@@ -530,7 +530,7 @@ Qed.
         assert len(have_names) == 0
 
         # Check for admits
-        assert check_for_sorries(theorem) is False
+        assert _check_for_sorries(theorem) is False
 
         # Remove imports
         no_imports = remove_import_lines(theorem)
