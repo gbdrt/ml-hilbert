@@ -1356,8 +1356,9 @@ class HILBERTWorker:
                     valid_sketch_attempts += 1
         else:
             logger.info("PARALLEL ATTEMPTS")
-            logger.info("TURNING OFF PROOF TREE SUPPORT")
-            self.proof_tree = None
+            logger.info("Proof tree will only track root status in parallel mode")
+            # Don't disable proof tree completely - keep root node tracking
+            # self.proof_tree = None  # Removed: we want to track final status
             result, generated_valid_proof_sketch = (
                 await self._run_async_pool_and_get_first_truthy(
                     self._single_subgoal_decomp_attempt, args_for_each_job
