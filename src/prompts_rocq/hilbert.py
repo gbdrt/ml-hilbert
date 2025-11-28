@@ -68,7 +68,7 @@ Instructions:
 3. There should be as many extracted theorems as `admit`/`Admitted` statements in the given theorem.
 4. Do NOT include any Require Import statements or Module declarations. ONLY include the theorem statement.
 5. Use a separate Coq ```coq``` block for each subgoal.
-6. Use `Admitted.` for the proof. Do NOT prove any theorem.
+6. Use `Admitted.` to close incomplete proofs. IMPORTANT: You CANNOT use `Qed.` unless the proof is complete. Always use `Admitted.` for placeholder proofs.
 7. Do NOT change the conclusion of the theorems from the extracted subgoals. Keep them AS IT IS.
 8. Do NOT change the conclusions of the preceding theorems when presenting them as hypotheses for the next subgoals. Keep them AS IT IS.
 9. Do NOT duplicate theorem names. Use distinct theorem names for the different theorems.
@@ -103,7 +103,7 @@ Instructions:
 1. For missing `assert` statements, extract only the missing `assert` statements as independent theorems with the same names.
 2. If `admit`/`Admitted` count is higher than the number of extracted subgoals, make sure that you are extracting all the missing subgoals needed to replace the `admit` placeholders with proofs.
 3. Do NOT include the already extracted theorems in your response.
-4. Do NOT try to prove the extracted theorems. Use `Admitted.` for the proof.
+4. Do NOT try to prove the extracted theorems. Use `Admitted.` to close incomplete proofs. IMPORTANT: You CANNOT use `Qed.` unless the proof is complete.
 5. Do NOT include any Require Import statements or Module declarations. ONLY include the theorem statement.
 6. Use a separate Coq ```coq``` block for each subgoal.
 
