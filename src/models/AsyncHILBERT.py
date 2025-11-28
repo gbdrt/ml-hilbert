@@ -10,9 +10,8 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from src.inference.AsyncProverLLM import AsyncProverLLM
 from src.tools.AsyncLLMClient import AsyncLLMClient
-from src.inference.AsyncLeanVerifier import AsyncLeanVerifier
 from src.tools.SemanticSearchEngine import SemanticSearchEngine
-from src.models.HILBERTWorker import HILBERTWorker
+from src.models.HILBERTWorker import HILBERTWorker, PROOF_SYSTEM
 from src.tracking.ProofAttemptConfig import ProofAttemptConfig
 from src.tracking.resource_tracking import MaxLLMCallsExceeded
 from src.tools.AsyncJobPool import AsyncJobPool
@@ -21,6 +20,22 @@ from logging import getLogger
 from src.tools.directories import check_if_file_exists, open_file_contents
 
 logger = getLogger(__name__)
+
+# ============================================================================
+# PROOF SYSTEM CONFIGURATION
+# ============================================================================
+# Import the proof system configuration from HILBERTWorker
+# This ensures both classes use the same verifier type
+
+# Conditional imports based on proof system
+if PROOF_SYSTEM == "LEAN":
+    from src.inference.AsyncLeanVerifier import AsyncLeanVerifier as AsyncVerifier
+elif PROOF_SYSTEM == "ROCQ":
+    from src.inference.AsyncRocqVerifier import AsyncRocqVerifier as AsyncVerifier
+else:
+    raise ValueError(f"Unknown PROOF_SYSTEM: {PROOF_SYSTEM}. Must be 'LEAN' or 'ROCQ'")
+
+# ============================================================================
 
 class AsyncHILBERT:
     """
@@ -34,7 +49,7 @@ class AsyncHILBERT:
                  # Client factory functions to create instances per worker
                  prover_llm_factory,  # Function that returns AsyncProverLLM instance
                  informal_llm_client_factory,  # Function that returns AsyncLLMClient instance
-                 lean_verifier_factory,  # Function that returns AsyncLeanVerifier instance
+                 proof_verifier_factory,  # Function that returns AsyncVerifier instance (Lean or Rocq)
                  search_engine: SemanticSearchEngine,  # Shared search engine
                  return_proofs: bool,
                  proof_attempt_config: ProofAttemptConfig = None,
@@ -49,11 +64,11 @@ class AsyncHILBERT:
                  enable_retrieval: bool = True):
         """
         Initialize AsyncHILBERT with factory functions for creating worker instances.
-        
+
         Args:
             prover_llm_factory: Function that returns AsyncProverLLM instance
-            informal_llm_client_factory: Function that returns AsyncLLMClient instance  
-            lean_verifier_factory: Function that returns AsyncLeanVerifier instance
+            informal_llm_client_factory: Function that returns AsyncLLMClient instance
+            proof_verifier_factory: Function that returns AsyncVerifier instance (Lean or Rocq based on PROOF_SYSTEM)
             search_engine: Shared SemanticSearchEngine instance
             return_proofs: Whether to return generated proofs in results
             proof_attempt_config: Configuration for all proof attempt limits and retry counts.
@@ -63,14 +78,14 @@ class AsyncHILBERT:
             verify_each_subgoal_separately: Whether to verify each subgoal separately
             complexity_proof_length_cutoff: Cutoff for proof complexity estimation
             max_tokens: Maximum tokens for LLM calls
-            proof_save_dir: Optional directory to save successful proofs as .lean files
+            proof_save_dir: Optional directory to save successful proofs (file extension determined by PROOF_SYSTEM)
             sequential_processing: If True, process problems one by one instead of in parallel
             run_proof_attempts_sequentially: If True, run proof attempts sequentially within each worker
         """
         # Store factory functions
         self.prover_llm_factory = prover_llm_factory
         self.informal_llm_client_factory = informal_llm_client_factory
-        self.lean_verifier_factory = lean_verifier_factory
+        self.proof_verifier_factory = proof_verifier_factory
         
         # Store shared resources and configuration
         self.search_engine = search_engine
@@ -117,23 +132,23 @@ class AsyncHILBERT:
     async def _create_worker(self) -> HILBERTWorker:
         """
         Create a new HILBERTWorker instance with fresh clients.
-        
+
         Returns:
             Configured HILBERTWorker instance
         """
         if self._closed:
             raise RuntimeError("AsyncHILBERT is closed")
-        
+
         # Create fresh instances for this worker
         prover_llm = self.prover_llm_factory()
         informal_llm_client = self.informal_llm_client_factory()
-        lean_verifier = self.lean_verifier_factory()
-        
+        proof_verifier = self.proof_verifier_factory()
+
         # Create worker with shared configuration
         worker = HILBERTWorker(
             prover_llm=prover_llm,
             informal_llm_client=informal_llm_client,
-            lean_verifier=lean_verifier,
+            proof_verifier=proof_verifier,
             search_engine=self.search_engine,  # Shared
             proof_attempt_config=self.proof_attempt_config,
             max_depth=self.max_depth,
@@ -144,7 +159,7 @@ class AsyncHILBERT:
             run_proof_attempts_sequentially=self.run_proof_attempts_sequentially,
             enable_retrieval=self.enable_retrieval
         )
-        
+
         # Track for cleanup
         self._active_workers.append(worker)
         return worker

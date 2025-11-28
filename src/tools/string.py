@@ -219,3 +219,54 @@ def remove_think_block(text: str) -> str:
         return think_pattern.sub("", text).strip()
     else:
         return text
+
+
+# Coq/Rocq-specific extraction functions
+
+def extract_coq_block(response: str) -> Optional[str]:
+    """
+    Extract a single Coq code block from a markdown response.
+
+    Looks for code blocks marked as coq, rocq, or Coq (case-insensitive).
+    If multiple blocks are found, returns the last one with a warning.
+
+    Args:
+        response: String potentially containing Coq code blocks
+
+    Returns:
+        The extracted Coq code as a string, or None if no Coq block found
+    """
+    # Pattern matches ```coq, ```rocq, ```Coq, etc.
+    coq_pattern = re.compile(r"```(?:coq|rocq|Coq|Rocq|COQ|ROCQ)\n?(.*?)\n?```", re.DOTALL | re.IGNORECASE)
+
+    matches = coq_pattern.findall(response)
+    if len(matches) == 1:
+        return matches[0].strip()
+    elif len(matches) > 1:
+        logger.info("WARNING! Multiple Coq blocks detected. Choosing the last one...")
+        logger.info("Full response:")
+        logger.info(response)
+        return matches[-1].strip()
+    else:
+        logger.info("No Coq code blocks detected.")
+        return None
+
+
+def extract_all_coq_blocks(response: str) -> Optional[List[str]]:
+    """
+    Parse all Coq blocks from a string.
+
+    Args:
+        response: String containing Coq code blocks
+
+    Returns:
+        List of extracted Coq blocks, or None if no Coq blocks found
+    """
+    # Pattern matches ```coq, ```rocq, etc. (case-insensitive)
+    coq_pattern = r'```(?:coq|rocq|Coq|Rocq|COQ|ROCQ)\s*\n(.*?)\n```'
+    blocks = re.findall(coq_pattern, response, re.DOTALL | re.IGNORECASE)
+
+    if not blocks:
+        return None  # No Coq blocks found
+
+    return [block.strip() for block in blocks]
