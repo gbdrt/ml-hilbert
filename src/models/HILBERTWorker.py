@@ -1218,6 +1218,13 @@ class HILBERTWorker:
 
             return success, proof
 
+        except Exception as e:
+            # If an exception occurred (e.g., MaxLLMCallsExceeded), mark as failed
+            logger.error("Exception during proof generation: %s", e)
+            await self.update_proof_tree_status(problem, ProofStatus.FAILED)
+            await self.print_proof_tree()
+            await self._save_proof_tree_to_file(problem_id)
+            raise  # Re-raise the exception
         finally:
             # Finalize statistics
             self._finalize_statistics(

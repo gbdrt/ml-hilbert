@@ -177,6 +177,7 @@ Rules:
 11. Ensure subgoals collectively provide everything needed for the main proof
 12. Make the logical dependencies between subgoals explicit. Ensure that the subgoals are valid and provable in Rocq/Coq.
 13. Do NOT change anything in the original theorem statement.
+14. IMPORTANT: End the proof with `Qed.` only if the proof is COMPLETE. If using `admit` anywhere, you MUST end with `Admitted.` instead of `Qed.`
 
 Rocq Hints:
 {lean_hints}
@@ -231,6 +232,7 @@ Instructions:
 5. Ensure there are no use of `admit` statements outside of `assert` statements. Do NOT use `admit` while proving the main theorem.
 6. Do NOT change anything in the original theorem statement.
 7. Do NOT nest `assert` statements in each other. Use distinct sub-goals as much as possible. Ensure all sub goals are named. Do NOT create anonymous assert statements.
+8. IMPORTANT: If the proof uses `admit` anywhere, you MUST end with `Admitted.` not `Qed.` You can only use `Qed.` for complete proofs.
 
 {useful_theorems_section}
 """
@@ -251,6 +253,7 @@ Instructions:
 5. Do NOT change anything in the original theorem statement.
 6. Do NOT include the helper theorem definitions in your response.
 7. Do NOT write a proof for any subgoal from scratch. ALWAYS use the supplied theorems.
+8. IMPORTANT: Since this should be a complete proof without `admit`, end with `Qed.` not `Admitted.`
 
 """
 
@@ -262,7 +265,7 @@ Instructions:
 1. Analyze why the error is happening, step-by-step. Add a brief explanation.
 2. Then, provide a corrected version of the Rocq/Coq code that addresses these specific errors.
 3. Do NOT include any other Coq code blocks except for the theorem.
-4. Use `Admitted.` for the proof.
+4. Use `Admitted.` to close the proof since it's incomplete. IMPORTANT: You CANNOT use `Qed.` for incomplete proofs.
 5. Do NOT include any Require Import statements or Module declarations.
 {potentially_useful_theorems}
 """
@@ -280,9 +283,10 @@ Instructions:
 1. Analyze what the theorem is trying to prove. Then, analyze why the error is happening, step-by-step. Add a brief explanation.
 2. Then, provide a corrected version of the Rocq/Coq code that addresses these specific errors.
 3. Do NOT include any other Coq code blocks except for the proof.
-4. Do NOT use `admit` or `Admitted`.
+4. Do NOT use `admit` or `Admitted`. This should be a complete proof.
 5. Do NOT include any Require Import statements or Module declarations.
 6. Do NOT change anything in the original theorem statement.
+7. IMPORTANT: Since this is a complete proof without `admit`, end with `Qed.` not `Admitted.`
 
 {useful_theorems_section}
 """
@@ -306,8 +310,9 @@ Rules:
 5. Use proper Rocq/Coq syntax and conventions. Ensure the proof is enclosed in triple backticks ```coq```.
 6. Only include a single Coq code block, corresponding to the proof along with the theorem statement.
 7. When dealing with large numerical quantities, avoid explicit computation as much as possible. Use tactics like rewrite to perform symbolic manipulation rather than numerical computation.
-8. Do NOT use `admit` or `Admitted`.
+8. Do NOT use `admit` or `Admitted`. This should be a complete proof.
 9. Do NOT change anything in the original theorem statement.
+10. IMPORTANT: Since this is a complete proof, end with `Qed.` not `Admitted.`
 {useful_theorems_section}
 """
 
@@ -367,6 +372,7 @@ Rules:
 13. Make the logical dependencies between subgoals explicit. Ensure that the subgoals are valid and provable in Rocq/Coq.
 14. Modify only the incorrect subgoal and everything that follows it in the proof sketch. Leave all preceding portions unchanged.
 15. Either modify the problematic subgoals to fix the errors, or add additional subgoals to fill in the missing mathematical arguments.
+16. IMPORTANT: If using `admit` anywhere, end with `Admitted.` not `Qed.` You can only use `Qed.` for complete proofs.
 """
 
 USE_SKETCH_AND_THEOREMS_TO_PROVE = """
@@ -383,10 +389,11 @@ Instructions:
 2. Do NOT modify the given theorems.
 3. Do NOT prove the given theorems.
 4. Do NOT modify the given proof sketch steps. Simply apply the given theorems to complete the missing `admit` steps.
-5. Do NOT use `admit` or `Admitted` in your proof.
+5. Do NOT use `admit` or `Admitted` in your proof. This should be a complete proof.
 6. Do NOT include any Require Import statements, Module declarations, or open statements.
 7. Do NOT re-define the given theorems in your response.
 8. Do NOT write a proof for any subgoal from scratch. ALWAYS use the supplied theorems.
+9. IMPORTANT: Since this is a complete proof without `admit`, end with `Qed.` not `Admitted.`
 IMPORTANT INSTRUCTION: Do NOT, under ANY circumstances, allow division and subtraction operations on natural number literals with UNDEFINED types, unless REQUIRED by the theorem statement. For example, do NOT allow literals like `1 / 3` or `2 / 5` or `1 - 3`. ALWAYS specify the types. AVOID natural number arithmetic UNLESS NEEDED by the theorem statement.
 ALWAYS specify types when describing fractions. For example, ((2%R) / 3) for reals or use Q (rationals). Do this everywhere EXCEPT the given theorem statement.
 IMPORTANT INSTRUCTION: Do NOT, under ANY circumstances, allow division and subtraction operations on variables of type nat, unless REQUIRED by the theorem statement. For example, do NOT allow expressions like (a-b) or (a/b) where a, b are of type nat. ALWAYS cast the variables to a suitable type (Z, Q, or R) when performing arithmetic operations. AVOID natural number arithmetic UNLESS NEEDED by the theorem statement.
