@@ -54,8 +54,25 @@ def run_async_hilbert(cfg):
     def create_proof_verifier():
         """Factory function to create AsyncVerifier instances (Lean or Rocq based on PROOF_SYSTEM)."""
         verifier_base_url = exp_cfg.verifier_base_url
-        return AsyncVerifier(base_url=verifier_base_url,
-                        max_concurrent_requests=max_concurrent_requests)
+
+        if PROOF_SYSTEM == "LEAN":
+            return AsyncVerifier(base_url=verifier_base_url,
+                            max_concurrent_requests=max_concurrent_requests)
+        elif PROOF_SYSTEM == "ROCQ":
+            # Parse host:port format (e.g., "127.0.0.1:8765")
+            if ":" in verifier_base_url:
+                # Remove http:// or https:// prefix if present
+                url = verifier_base_url.replace("http://", "").replace("https://", "")
+                host, port_str = url.split(":", 1)
+                port = int(port_str.rstrip("/"))  # Remove trailing slash if present
+            else:
+                host = verifier_base_url
+                port = 8765  # Default port for petanque
+
+            return AsyncVerifier(host=host, port=port,
+                            max_concurrent_requests=max_concurrent_requests)
+        else:
+            raise ValueError(f"Unknown PROOF_SYSTEM: {PROOF_SYSTEM}")
 
     # Create the shared semantic search engine (thread-safe)
     search_engine_params = {k: v for k, v in search_engine_cfg.items()}
