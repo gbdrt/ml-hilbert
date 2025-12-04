@@ -26,6 +26,10 @@ from src.tools.rocq_utils import (
     remove_import_lines,
     replace_have_proofs_with_sorry,
     _remove_comments,
+    extract_module_names_from_search_results,
+    generate_require_imports,
+    extract_existing_imports,
+    add_imports_to_header,
 )
 from tests.rocq_test_helpers import validate_coq_code
 
@@ -549,3 +553,146 @@ Qed.
         thm3 = "Require Import Lia. Theorem bar : forall n, n + 1 = 1 + n. Proof. intros. lia. Qed."
         assert validate_rocq_code(thm3)
         assert check_theorem_signature_match(thm1, thm3) is False
+
+
+class TestImportHandling:
+    """Tests for import statement handling functions."""
+
+    def test_extract_module_names_from_search_results(self):
+        """Test extracting module names from search results."""
+        search_results = """
+1. [THEOREM] Addition is commutative
+Module: Coq.Arith.PeanoNat
+Name: Nat.add_comm
+Description: Commutativity of addition
+
+2. [LEMMA] List append is associative
+Module: Coq.Lists.List
+Name: List.app_assoc
+Description: Associativity of list append
+"""
+        modules = extract_module_names_from_search_results(search_results)
+        assert "Coq.Arith.PeanoNat" in modules
+        assert "Coq.Lists.List" in modules
+        assert len(modules) == 2
+
+    def test_extract_module_names_empty(self):
+        """Test extracting from empty results."""
+        assert extract_module_names_from_search_results("") == set()
+        assert extract_module_names_from_search_results("No results found") == set()
+
+    def test_generate_require_imports(self):
+        """Test generating Require Import statements."""
+        modules = {"Coq.Arith.PeanoNat", "Coq.Lists.List"}
+        imports = generate_require_imports(modules)
+
+        # Should contain both import statements
+        assert "Require Import Coq.Arith.PeanoNat." in imports
+        assert "Require Import Coq.Lists.List." in imports
+
+        # Check format
+        lines = imports.strip().split("\n")
+        assert len(lines) == 2
+        for line in lines:
+            assert line.startswith("Require Import ")
+            assert line.endswith(".")
+
+    def test_generate_require_imports_empty(self):
+        """Test generating imports from empty set."""
+        assert generate_require_imports(set()) == ""
+
+    def test_generate_require_imports_sorted(self):
+        """Test that imports are sorted alphabetically."""
+        modules = {"Coq.ZArith.BinInt", "Coq.Arith.PeanoNat", "Coq.Lists.List"}
+        imports = generate_require_imports(modules)
+        lines = imports.strip().split("\n")
+
+        # Should be in alphabetical order
+        assert lines[0] == "Require Import Coq.Arith.PeanoNat."
+        assert lines[1] == "Require Import Coq.Lists.List."
+        assert lines[2] == "Require Import Coq.ZArith.BinInt."
+
+    def test_extract_existing_imports(self):
+        """Test extracting existing imports from header."""
+        header = """
+Require Import Coq.Arith.PeanoNat.
+Require Import Coq.Lists.List.
+
+(* Some comments *)
+"""
+        existing = extract_existing_imports(header)
+        assert "Coq.Arith.PeanoNat" in existing
+        assert "Coq.Lists.List" in existing
+        assert len(existing) == 2
+
+    def test_extract_existing_imports_empty(self):
+        """Test extracting from empty header."""
+        assert extract_existing_imports("") == set()
+        assert extract_existing_imports("(* Just comments *)") == set()
+
+    def test_extract_existing_imports_various_formats(self):
+        """Test extracting imports with various formatting."""
+        header = """
+Require Import Coq.Arith.PeanoNat.
+Require  Import  Coq.Lists.List.
+Require Import Lia.
+"""
+        existing = extract_existing_imports(header)
+        assert "Coq.Arith.PeanoNat" in existing
+        assert "Coq.Lists.List" in existing
+        assert "Lia" in existing
+
+    def test_add_imports_to_header_new(self):
+        """Test adding new imports to header."""
+        header = "Require Import Coq.Arith.PeanoNat."
+        new_modules = {"Coq.Lists.List", "Lia"}
+
+        updated = add_imports_to_header(header, new_modules)
+
+        # Should contain original import
+        assert "Require Import Coq.Arith.PeanoNat." in updated
+        # Should contain new imports
+        assert "Require Import Coq.Lists.List." in updated
+        assert "Require Import Lia." in updated
+
+    def test_add_imports_to_header_no_duplicates(self):
+        """Test that duplicate imports are not added."""
+        header = "Require Import Coq.Arith.PeanoNat.\nRequire Import Coq.Lists.List."
+        new_modules = {"Coq.Lists.List", "Lia"}  # List is duplicate
+
+        updated = add_imports_to_header(header, new_modules)
+
+        # Should only add Lia, not duplicate List
+        import_count = updated.count("Require Import Coq.Lists.List.")
+        assert import_count == 1
+        assert "Require Import Lia." in updated
+
+    def test_add_imports_to_header_empty_header(self):
+        """Test adding imports to empty header."""
+        header = ""
+        new_modules = {"Coq.Arith.PeanoNat", "Coq.Lists.List"}
+
+        updated = add_imports_to_header(header, new_modules)
+
+        assert "Require Import Coq.Arith.PeanoNat." in updated
+        assert "Require Import Coq.Lists.List." in updated
+
+    def test_add_imports_to_header_no_new_modules(self):
+        """Test adding empty set of modules."""
+        header = "Require Import Coq.Arith.PeanoNat."
+        new_modules = set()
+
+        updated = add_imports_to_header(header, new_modules)
+
+        # Should remain unchanged
+        assert updated == header
+
+    def test_add_imports_to_header_all_duplicates(self):
+        """Test when all new modules are already imported."""
+        header = "Require Import Coq.Arith.PeanoNat.\nRequire Import Coq.Lists.List."
+        new_modules = {"Coq.Arith.PeanoNat", "Coq.Lists.List"}
+
+        updated = add_imports_to_header(header, new_modules)
+
+        # Should remain unchanged
+        assert updated == header

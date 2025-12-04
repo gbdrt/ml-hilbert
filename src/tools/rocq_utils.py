@@ -9,7 +9,7 @@ This module provides Rocq equivalents of the Lean utility functions.
 """
 import re
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -282,10 +282,12 @@ def replace_have_proofs_with_sorry(theorem_text: str) -> str:
     # This is a simplified version - full implementation would need proper parsing
 
     # Pattern: assert (H : P) by tactic. -> assert (H : P) by admit.
-    result = re.sub(r"(assert\s*\([^)]+\)\s*by\s+)[^.]+\.", r"\1admit.", theorem_text)
+    # Matches period followed by space OR period at end of string
+    result = re.sub(r"(assert\s*\([^)]+\)\s*by\s+).+?\.(\s|$)", r"\1admit.\2", theorem_text)
 
     # Pattern: have H : P by tactic. -> have H : P by admit.
-    result = re.sub(r"(have\s+\w+\s*:\s*[^.]+\s+by\s+)[^.]+\.", r"\1admit.", result)
+    # Matches period followed by space OR period at end of string
+    result = re.sub(r"(have\s+\w+\s*:\s*[^.]+\s+by\s+).+?\.(\s|$)", r"\1admit.\2", result)
 
     return result
 
@@ -326,6 +328,138 @@ def extract_missing_identifiers(error_message: str) -> List[str]:
     identifiers.extend(matches)
 
     return identifiers
+
+
+def extract_module_names_from_search_results(search_results: str) -> Set[str]:
+    """
+    Extract unique module names from formatted search results.
+
+    Args:
+        search_results: Formatted search results string from SemanticSearchEngine
+
+    Returns:
+        Set of unique module names (e.g., {"Coq.Arith.PeanoNat", "Coq.Lists.List"})
+
+    Example:
+        >>> results = "Module: Coq.Arith.PeanoNat\\nName: Nat.add_0_r"
+        >>> extract_module_names_from_search_results(results)
+        {'Coq.Arith.PeanoNat'}
+    """
+    if not search_results:
+        return set()
+
+    module_names = set()
+
+    # Pattern to match "Module: <module_name>" lines
+    module_pattern = r"Module:\s*(.+)"
+    matches = re.findall(module_pattern, search_results)
+
+    for match in matches:
+        module_name = match.strip()
+        if module_name:
+            module_names.add(module_name)
+
+    return module_names
+
+
+def generate_require_imports(module_names: Set[str]) -> str:
+    """
+    Generate Require Import statements from a set of module names.
+
+    Args:
+        module_names: Set of module names (e.g., {"Coq.Arith.PeanoNat", "Coq.Lists.List"})
+
+    Returns:
+        String containing Require Import statements, one per line
+
+    Example:
+        >>> modules = {"Coq.Arith.PeanoNat", "Coq.Lists.List"}
+        >>> print(generate_require_imports(modules))
+        Require Import Coq.Arith.PeanoNat.
+        Require Import Coq.Lists.List.
+    """
+    if not module_names:
+        return ""
+
+    # Sort for deterministic output
+    sorted_modules = sorted(module_names)
+
+    import_statements = []
+    for module in sorted_modules:
+        import_statements.append(f"Require Import {module}.")
+
+    return "\n".join(import_statements)
+
+
+def extract_existing_imports(header: str) -> Set[str]:
+    """
+    Extract existing Require Import statements from a header.
+
+    Args:
+        header: The header section of a Coq file
+
+    Returns:
+        Set of module names that are already imported
+
+    Example:
+        >>> header = "Require Import Coq.Arith.PeanoNat.\\nRequire Import Coq.Lists.List."
+        >>> extract_existing_imports(header)
+        {'Coq.Arith.PeanoNat', 'Coq.Lists.List'}
+    """
+    if not header:
+        return set()
+
+    existing_imports = set()
+
+    # Pattern to match "Require Import <module>." statements
+    # Captures module names that can contain dots (e.g., Coq.Arith.PeanoNat)
+    import_pattern = r"Require\s+Import\s+([A-Za-z0-9_.]+)\."
+    matches = re.findall(import_pattern, header)
+
+    for match in matches:
+        existing_imports.add(match.strip())
+
+    return existing_imports
+
+
+def add_imports_to_header(header: str, new_modules: Set[str]) -> str:
+    """
+    Add new Require Import statements to a header, avoiding duplicates.
+
+    Args:
+        header: Existing header section
+        new_modules: Set of new module names to import
+
+    Returns:
+        Updated header with new import statements added
+
+    Example:
+        >>> header = "Require Import Coq.Arith.PeanoNat."
+        >>> new_modules = {"Coq.Lists.List", "Coq.Arith.PeanoNat"}
+        >>> print(add_imports_to_header(header, new_modules))
+        Require Import Coq.Arith.PeanoNat.
+        Require Import Coq.Lists.List.
+    """
+    if not new_modules:
+        return header
+
+    # Extract existing imports
+    existing_imports = extract_existing_imports(header)
+
+    # Filter out modules that are already imported
+    modules_to_add = new_modules - existing_imports
+
+    if not modules_to_add:
+        return header
+
+    # Generate new import statements
+    new_import_statements = generate_require_imports(modules_to_add)
+
+    # Add to header
+    if header.strip():
+        return header.rstrip() + "\n" + new_import_statements
+    else:
+        return new_import_statements
 
 
 def extract_all_have_names(text_string: str) -> List[str]:

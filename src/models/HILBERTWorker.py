@@ -17,7 +17,8 @@ from src.tracking.ProofProgressTracker import (
     ProofStatus,
     ProofStrategy,
 )
-from src.tools.SemanticSearchEngine import SemanticSearchEngine
+
+# from src.tools.SemanticSearchEngine import SemanticSearchEngine
 from src.tools.AsyncJobPool import AsyncJobPool
 from src.tools.directories import write_string_to_file, make_dirs
 from src.tracking.ProofStatistics import (
@@ -41,7 +42,7 @@ logger = getLogger(__name__)
 # PROOF SYSTEM CONFIGURATION
 # ============================================================================
 # Set this to either "LEAN" or "ROCQ" to switch between proof systems
-PROOF_SYSTEM = "LEAN"  # Options: "LEAN" or "ROCQ"
+PROOF_SYSTEM = "ROCQ"  # Options: "LEAN" or "ROCQ"
 
 # Conditional imports based on proof system
 if PROOF_SYSTEM == "LEAN":
@@ -112,6 +113,8 @@ elif PROOF_SYSTEM == "ROCQ":
         extract_all_have_names,
         _check_for_sorries,
         _extract_all_theorems_from_string,
+        extract_module_names_from_search_results,
+        add_imports_to_header,
         remove_import_lines,
     )
     from src.tracking.resource_tracking import (
@@ -761,8 +764,8 @@ class HILBERTWorker:
         useful_theorems = ""
         for i in range(self.proof_config.main_theorem_error_corrections):
             # check if we need any missing theorems
-            useful_theorems = await self._augment_useful_theorems(
-                error_message, problem, useful_theorems
+            useful_theorems, header = await self._augment_useful_theorems_and_header(
+                error_message, problem, header, useful_theorems
             )
             if useful_theorems:
                 useful_theorems_str = POTENTIALLY_USEFUL_THEOREMS_PROMPT.format(
@@ -1488,6 +1491,58 @@ class HILBERTWorker:
                 useful_theorems += "\n" + additional_theorems
         return useful_theorems
 
+    async def _augment_useful_theorems_and_header(
+        self, error_message: str, problem: str, header: str, useful_theorems: str = ""
+    ) -> Tuple[str, str]:
+        """
+        Augment useful theorems and update header with required imports (for Rocq).
+
+        For Rocq, also extracts module names from search results and adds
+        Require Import statements to the header.
+
+        Returns:
+            Tuple of (updated_useful_theorems, updated_header)
+        """
+        # Return unchanged if retrieval is disabled
+        if not self.enable_retrieval:
+            return useful_theorems, header
+
+        missing_identifiers = extract_missing_identifiers(error_message)
+        if missing_identifiers:
+            logger.info(80 * "*")
+            logger.info("Using conversational search for missing identifiers")
+            logger.info("Missing identifiers: %s", missing_identifiers)
+            logger.info(80 * "*")
+
+            # Use search_and_select with the error message to get relevant theorems
+            additional_theorems = await self.search_and_select(
+                problem=problem, error_message=error_message
+            )
+
+            logger.info("Additional theorems found:")
+            logger.info(additional_theorems)
+            logger.info(80 * "*")
+
+            if additional_theorems and additional_theorems not in useful_theorems:
+                useful_theorems += "\n" + additional_theorems
+
+                # For Rocq, also update the header with required imports
+                if PROOF_SYSTEM == "ROCQ":
+                    module_names = extract_module_names_from_search_results(
+                        additional_theorems
+                    )
+                    if module_names:
+                        logger.info(
+                            "Extracting module names from search results: %s",
+                            module_names,
+                        )
+                        header = add_imports_to_header(header, module_names)
+                        logger.info("Updated header with imports:")
+                        logger.info(header)
+                        logger.info(80 * "*")
+
+        return useful_theorems, header
+
     async def _single_verify_and_correct_subgoal(
         self, theorem: str, header: str, useful_theorems: str, depth: int
     ) -> Optional[str]:
@@ -1523,8 +1578,8 @@ class HILBERTWorker:
             logger.info(80 * "-")
 
             # add more useful theorems using conversational search approach
-            useful_theorems = await self._augment_useful_theorems(
-                error_message, theorem, useful_theorems
+            useful_theorems, header = await self._augment_useful_theorems_and_header(
+                error_message, theorem, header, useful_theorems
             )
 
             logger.info(80 * "*")
@@ -2073,8 +2128,10 @@ class HILBERTWorker:
                 logger.info("Error Message: %s", error_message)
                 logger.info(80 * "-")
                 # augment useful theorems
-                useful_theorems = await self._augment_useful_theorems(
-                    error_message, problem, useful_theorems
+                useful_theorems, header = (
+                    await self._augment_useful_theorems_and_header(
+                        error_message, problem, header, useful_theorems
+                    )
                 )
                 # correct syntax/tactic errors
                 logger.info("NEW USEFUL THEOREMS FOR CORRECTION")
